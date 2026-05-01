@@ -3,6 +3,9 @@ node_modules/
 .pnp
 .pnp.js
 
+# Nested project copy (stale, should never be deployed)
+taskie/
+
 # Testing
 /coverage
 
