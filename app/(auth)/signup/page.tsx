@@ -14,7 +14,6 @@ const signupSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["ADMIN", "MEMBER"]),
 });
 
 type SignupForm = z.infer<typeof signupSchema>;
@@ -31,7 +30,6 @@ export default function SignupPage() {
     formState: { errors },
   } = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { role: "MEMBER" },
   });
 
   const onSubmit = async (data: SignupForm) => {
@@ -103,20 +101,6 @@ export default function SignupPage() {
             />
             {errors.password && (
               <p className="text-red-400 text-xs">{errors.password.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-300">Role</label>
-            <select
-              {...register("role")}
-              className="w-full px-4 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm"
-            >
-              <option value="MEMBER">Member</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-            {errors.role && (
-              <p className="text-red-400 text-xs">{errors.role.message}</p>
             )}
           </div>
 

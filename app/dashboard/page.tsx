@@ -2,6 +2,7 @@
 import { getDashboardStats } from "@/actions/tasks";
 import { getProjects } from "@/actions/projects";
 import { auth } from "@/auth";
+import { checkAndNotifyOverdue } from "@/actions/notifications";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -11,9 +12,15 @@ import {
   FolderKanban,
   ArrowRight,
   Plus,
+  ArrowUp,
+  Minus,
+  ArrowDown,
+  Zap,
 } from "lucide-react";
 import { format } from "date-fns";
 import CreateProjectModal from "@/components/CreateProjectModal";
+import RoleSelector from "@/components/RoleSelector";
+import AddMemberModal from "@/components/AddMemberModal";
 
 function StatCard({
   label,
@@ -72,11 +79,22 @@ export default async function DashboardPage() {
 
   const isAdmin = session?.user?.role === "ADMIN";
 
+  // Silently check + fire overdue notifications for admins
+  if (isAdmin) {
+    await checkAndNotifyOverdue();
+  }
+
   if (!stats) {
     return (
       <div className="text-slate-400">Failed to load dashboard data.</div>
     );
   }
+
+  // Priority breakdown from recentProjects data (if needed for chart)
+  const completionRate =
+    stats.totalTasks > 0
+      ? Math.round((stats.done / stats.totalTasks) * 100)
+      : 0;
 
   return (
     <div className="space-y-8">
@@ -93,35 +111,47 @@ export default async function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Tasks"
-          value={stats.totalTasks}
-          icon={ListTodo}
-          color="text-indigo-400"
-          bgColor="bg-indigo-500/10"
-        />
-        <StatCard
-          label="In Progress"
-          value={stats.inProgress}
-          icon={Clock}
-          color="text-yellow-400"
-          bgColor="bg-yellow-500/10"
-        />
-        <StatCard
-          label="Completed"
-          value={stats.done}
-          icon={CheckCircle2}
-          color="text-green-400"
-          bgColor="bg-green-500/10"
-        />
-        <StatCard
-          label="Overdue"
-          value={stats.overdue}
-          icon={AlertTriangle}
-          color="text-red-400"
-          bgColor="bg-red-500/10"
-        />
+        <StatCard label="Total Tasks" value={stats.totalTasks} icon={ListTodo} color="text-indigo-400" bgColor="bg-indigo-500/10" />
+        <StatCard label="In Progress" value={stats.inProgress} icon={Clock} color="text-yellow-400" bgColor="bg-yellow-500/10" />
+        <StatCard label="Completed" value={stats.done} icon={CheckCircle2} color="text-green-400" bgColor="bg-green-500/10" />
+        <StatCard label="Overdue" value={stats.overdue} icon={AlertTriangle} color="text-red-400" bgColor="bg-red-500/10" />
       </div>
+
+      {/* Analytics Bar */}
+      {stats.totalTasks > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Task Overview</h2>
+          <div className="space-y-3">
+            {[
+              { label: "To Do", count: stats.todo, color: "bg-slate-500", textColor: "text-slate-300" },
+              { label: "In Progress", count: stats.inProgress, color: "bg-yellow-500", textColor: "text-yellow-400" },
+              { label: "Done", count: stats.done, color: "bg-green-500", textColor: "text-green-400" },
+              { label: "Overdue", count: stats.overdue, color: "bg-red-500", textColor: "text-red-400" },
+            ].map(({ label, count, color, textColor }) => (
+              <div key={label} className="flex items-center gap-3">
+                <span className="text-slate-500 text-xs w-20 shrink-0">{label}</span>
+                <div className="flex-1 bg-slate-800 rounded-full h-2">
+                  <div
+                    className={`${color} h-2 rounded-full transition-all`}
+                    style={{ width: `${stats.totalTasks > 0 ? (count / stats.totalTasks) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className={`text-xs font-medium w-8 text-right ${textColor}`}>{count}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 pt-4 border-t border-slate-800 flex items-center gap-2">
+            <span className="text-slate-500 text-xs">Completion rate</span>
+            <div className="flex-1 bg-slate-800 rounded-full h-2">
+              <div
+                className="bg-indigo-500 h-2 rounded-full transition-all"
+                style={{ width: `${completionRate}%` }}
+              />
+            </div>
+            <span className="text-indigo-400 text-xs font-semibold">{completionRate}%</span>
+          </div>
+        </div>
+      )}
 
       {/* Recent Projects */}
       <div>
@@ -208,9 +238,12 @@ export default async function DashboardPage() {
       </div>
 
       {/* Team Members */}
-      {isAdmin && stats.allUsers.length > 0 && (
+      {stats.allUsers.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-white mb-4">Team Members</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white">Team Members</h2>
+            {isAdmin && <AddMemberModal />}
+          </div>
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
             <table className="w-full">
               <thead>
@@ -246,15 +279,19 @@ export default async function DashboardPage() {
                       {user.email}
                     </td>
                     <td className="px-6 py-3.5">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                          user.role === "ADMIN"
-                            ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/30"
-                            : "bg-slate-800 text-slate-400 border-slate-700"
-                        }`}
-                      >
-                        {user.role}
-                      </span>
+                      {isAdmin && user.id !== session?.user?.id ? (
+                        <RoleSelector userId={user.id} currentRole={user.role as "ADMIN" | "MEMBER"} />
+                      ) : (
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                            user.role === "ADMIN"
+                              ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/30"
+                              : "bg-slate-800 text-slate-400 border-slate-700"
+                          }`}
+                        >
+                          {user.role}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -1,18 +1,12 @@
-// app/projects/layout.tsx
+// app/audit-log/layout.tsx
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { getUnreadCount } from "@/actions/notifications";
 
-export default async function ProjectsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function AuditLogLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  if (!session?.user) {
-    redirect("/login");
-  }
+  if (!session?.user || session.user.role !== "ADMIN") redirect("/dashboard");
 
   const unreadCount = await getUnreadCount();
 

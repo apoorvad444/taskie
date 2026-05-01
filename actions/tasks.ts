@@ -5,12 +5,14 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { TaskStatus } from "@prisma/client";
+import { TaskStatus, Priority } from "@prisma/client";
+import { notifyAllAdmins } from "@/actions/notifications";
 
 const taskSchema = z.object({
   title: z.string().min(2, "Task title must be at least 2 characters"),
   description: z.string().optional(),
   status: z.enum(["TODO", "IN_PROGRESS", "DONE"]).default("TODO"),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
   dueDate: z.string().optional(),
   projectId: z.string(),
   assigneeId: z.string().optional(),
@@ -40,7 +42,7 @@ export async function createTask(
       return { success: false, message: parsed.error.errors[0].message };
     }
 
-    const { title, description, status, dueDate, projectId, assigneeId } =
+    const { title, description, status, priority, dueDate, projectId, assigneeId } =
       parsed.data;
 
     // Verify project exists
@@ -67,9 +69,35 @@ export async function createTask(
         title,
         description,
         status: status as TaskStatus,
+        priority: priority as Priority,
         dueDate: dueDate ? new Date(dueDate) : undefined,
         projectId,
         assigneeId: assigneeId || undefined,
+      },
+    });
+
+    // Notify assignee
+    if (assigneeId && assigneeId !== session.user.id) {
+      const proj = await prisma.project.findUnique({ where: { id: projectId }, select: { name: true } });
+      await prisma.notification.create({
+        data: {
+          userId: assigneeId,
+          message: `You have been assigned a new task "${title}" in project "${proj?.name ?? ""}".`,
+          taskId: task.id,
+          projectId,
+        },
+      });
+    }
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        action: "TASK_CREATED",
+        entityType: "TASK",
+        entityId: task.id,
+        meta: { title, projectId, priority, status },
+        userId: session.user.id,
+        userName: session.user.name ?? "Unknown",
       },
     });
 
@@ -120,10 +148,53 @@ export async function updateTask(
         ...(title && { title }),
         ...(description !== undefined && { description }),
         ...(status && { status: status as TaskStatus }),
+        ...(formData.priority && { priority: formData.priority as Priority }),
         ...(dueDate && { dueDate: new Date(dueDate) }),
         ...(assigneeId !== undefined && {
           assigneeId: assigneeId || null,
         }),
+      },
+    });
+
+    // Notify new assignee if changed
+    if (
+      assigneeId &&
+      assigneeId !== task.assigneeId &&
+      assigneeId !== session.user.id
+    ) {
+      const taskTitle = title ?? task.title;
+      const proj = await prisma.project.findUnique({ where: { id: task.projectId }, select: { name: true } });
+      await prisma.notification.create({
+        data: {
+          userId: assigneeId,
+          message: `You have been assigned task "${taskTitle}" in project "${proj?.name ?? ""}".`,
+          taskId: id,
+          projectId: task.projectId,
+        },
+      });
+    }
+
+    // Notify admins when status changes (by any user)
+    if (status && status !== task.status) {
+      await notifyAllAdmins(
+        `Task "${task.title}" status changed to ${status.replace("_", " ")} by ${session.user.name ?? "a member"}.`,
+        id,
+        task.projectId
+      );
+    }
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        action: status && status !== task.status ? "TASK_STATUS_CHANGED" : "TASK_UPDATED",
+        entityType: "TASK",
+        entityId: id,
+        meta: {
+          title: title ?? task.title,
+          ...(status && { from: task.status, to: status }),
+        },
+        userId: session.user.id,
+        userName: session.user.name ?? "Unknown",
       },
     });
 
@@ -151,6 +222,18 @@ export async function deleteTask(taskId: string): Promise<ActionResult> {
     if (!task) return { success: false, message: "Task not found." };
 
     await prisma.task.delete({ where: { id: taskId } });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        action: "TASK_DELETED",
+        entityType: "TASK",
+        entityId: taskId,
+        meta: { title: task.title, projectId: task.projectId },
+        userId: session.user.id,
+        userName: session.user.name ?? "Unknown",
+      },
+    });
 
     revalidatePath(`/projects/${task.projectId}`);
     revalidatePath("/dashboard");
@@ -211,5 +294,19 @@ export async function getAllUsers() {
   return prisma.user.findMany({
     select: { id: true, name: true, email: true, role: true },
     orderBy: { name: "asc" },
+  });
+}
+
+export async function getMyTasks() {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+
+  return prisma.task.findMany({
+    where: { assigneeId: session.user.id },
+    include: {
+      project: { select: { id: true, name: true } },
+      assignee: { select: { id: true, name: true } },
+    },
+    orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
   });
 }

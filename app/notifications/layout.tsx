@@ -1,18 +1,16 @@
-// app/projects/layout.tsx
+// app/notifications/layout.tsx
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { getUnreadCount } from "@/actions/notifications";
 
-export default async function ProjectsLayout({
+export default async function NotificationsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const session = await auth();
-  if (!session?.user) {
-    redirect("/login");
-  }
+  if (!session?.user) redirect("/login");
 
   const unreadCount = await getUnreadCount();
 

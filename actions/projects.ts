@@ -39,6 +39,9 @@ export async function createProject(
         name: parsed.data.name,
         description: parsed.data.description,
         ownerId: session.user.id,
+        members: {
+          create: { userId: session.user.id },
+        },
       },
     });
 
@@ -78,6 +81,7 @@ export async function getProjectById(id: string) {
       tasks: {
         include: {
           assignee: { select: { id: true, name: true, email: true } },
+          _count: { select: { comments: true } },
         },
         orderBy: { createdAt: "desc" },
       },
@@ -87,8 +91,7 @@ export async function getProjectById(id: string) {
   return project;
 }
 
-export async function deleteProject(projectId: string): Promise<ActionResult> {
-  try {
+export async function deleteProject(projectId: string): Promise<ActionResult> {  try {
     const session = await auth();
     if (!session?.user) {
       return { success: false, message: "Unauthorized." };
@@ -106,5 +109,52 @@ export async function deleteProject(projectId: string): Promise<ActionResult> {
   } catch (error) {
     console.error("Delete project error:", error);
     return { success: false, message: "Failed to delete project." };
+  }
+}
+
+export async function getProjectMembers(projectId: string) {
+  const session = await auth();
+  if (!session?.user) return [];
+
+  const members = await prisma.projectMember.findMany({
+    where: { projectId },
+    include: { user: { select: { id: true, name: true, email: true, role: true } } },
+    orderBy: { joinedAt: "asc" },
+  });
+  return members.map((m) => m.user);
+}
+
+export async function addProjectMember(projectId: string, userId: string): Promise<ActionResult> {
+  try {
+    const session = await auth();
+    if (!session?.user || session.user.role !== "ADMIN") {
+      return { success: false, message: "Unauthorized." };
+    }
+    await prisma.projectMember.create({ data: { projectId, userId } });
+    revalidatePath(`/projects/${projectId}`);
+    return { success: true, message: "Member added to project." };
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return { success: false, message: "User is already a member." };
+    }
+    console.error("Add project member error:", error);
+    return { success: false, message: "Failed to add member." };
+  }
+}
+
+export async function removeProjectMember(projectId: string, userId: string): Promise<ActionResult> {
+  try {
+    const session = await auth();
+    if (!session?.user || session.user.role !== "ADMIN") {
+      return { success: false, message: "Unauthorized." };
+    }
+    await prisma.projectMember.delete({
+      where: { projectId_userId: { projectId, userId } },
+    });
+    revalidatePath(`/projects/${projectId}`);
+    return { success: true, message: "Member removed from project." };
+  } catch (error) {
+    console.error("Remove project member error:", error);
+    return { success: false, message: "Failed to remove member." };
   }
 }

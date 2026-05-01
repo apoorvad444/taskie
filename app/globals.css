@@ -63,3 +63,51 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* =====================================================
+   LIGHT MODE OVERRIDES
+   next-themes removes .dark from <html> in light mode.
+   These selectors remap hardcoded dark slate classes.
+   ===================================================== */
+
+/* --- Backgrounds --- */
+html:not(.dark) .bg-slate-950 { background-color: #f1f5f9 !important; }
+html:not(.dark) .bg-slate-900 { background-color: #ffffff !important; }
+html:not(.dark) .bg-slate-800 { background-color: #f1f5f9 !important; }
+html:not(.dark) .bg-slate-700 { background-color: #e2e8f0 !important; }
+
+/* Opacity variants */
+html:not(.dark) .bg-slate-800\/40 { background-color: rgba(226,232,240,0.7) !important; }
+html:not(.dark) .bg-slate-800\/50 { background-color: rgba(226,232,240,0.7) !important; }
+
+/* --- Text --- */
+html:not(.dark) .text-white  { color: #0f172a !important; }
+html:not(.dark) .text-slate-300 { color: #475569 !important; }
+html:not(.dark) .text-slate-400 { color: #64748b !important; }
+html:not(.dark) .text-slate-500 { color: #94a3b8 !important; }
+html:not(.dark) .text-slate-600 { color: #94a3b8 !important; }
+
+/* --- Borders --- */
+html:not(.dark) .border-slate-800 { border-color: #e2e8f0 !important; }
+html:not(.dark) .border-slate-700 { border-color: #cbd5e1 !important; }
+
+/* Divide utility */
+html:not(.dark) .divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2e8f0 !important;
+}
+
+/* --- Hover states --- */
+html:not(.dark) .hover\:bg-slate-800:hover  { background-color: #f1f5f9 !important; }
+html:not(.dark) .hover\:bg-slate-800\/50:hover { background-color: rgba(226,232,240,0.5) !important; }
+html:not(.dark) .hover\:bg-slate-800\/40:hover { background-color: rgba(226,232,240,0.4) !important; }
+html:not(.dark) .hover\:text-white:hover    { color: #0f172a !important; }
+
+/* --- Sidebar — fixed left panel --- */
+html:not(.dark) .fixed.bg-slate-900 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 1px 0 0 #e2e8f0;
+}
+
+/* --- Transition smoothing for theme switch --- */
+html { transition: background-color 0.2s ease, color 0.2s ease; }

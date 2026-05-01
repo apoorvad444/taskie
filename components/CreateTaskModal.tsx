@@ -13,6 +13,7 @@ const schema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters"),
   description: z.string().optional(),
   status: z.enum(["TODO", "IN_PROGRESS", "DONE"]).default("TODO"),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
   dueDate: z.string().optional(),
   assigneeId: z.string().optional(),
 });
@@ -42,7 +43,7 @@ export default function CreateTaskModal({ projectId, users }: CreateTaskModalPro
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { status: "TODO" },
+    defaultValues: { status: "TODO", priority: "MEDIUM" },
   });
 
   const onSubmit = async (data: FormData) => {
@@ -138,14 +139,29 @@ export default function CreateTaskModal({ projectId, users }: CreateTaskModalPro
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-300">
-                    Due Date
+                    Priority
                   </label>
-                  <input
-                    {...register("dueDate")}
-                    type="date"
+                  <select
+                    {...register("priority")}
                     className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm"
-                  />
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                    <option value="URGENT">Urgent</option>
+                  </select>
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-300">
+                  Due Date
+                </label>
+                <input
+                  {...register("dueDate")}
+                  type="date"
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm"
+                />
               </div>
 
               <div className="space-y-1">

@@ -11,8 +11,12 @@ import {
   CheckSquare,
   User,
   Shield,
+  Bell,
+  ClipboardList,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ThemeToggle from "@/components/ThemeToggle";
 
 interface SidebarProps {
   user: {
@@ -20,6 +24,7 @@ interface SidebarProps {
     email?: string | null;
     role?: string;
   };
+  unreadCount?: number;
 }
 
 const navItems = [
@@ -27,8 +32,9 @@ const navItems = [
   { href: "/projects", label: "Projects", icon: FolderKanban },
 ];
 
-export default function Sidebar({ user }: SidebarProps) {
+export default function Sidebar({ user, unreadCount = 0 }: SidebarProps) {
   const pathname = usePathname();
+  const isAdmin = user.role === "ADMIN";
 
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-slate-900 border-r border-slate-800 flex flex-col z-50">
@@ -45,7 +51,7 @@ export default function Sidebar({ user }: SidebarProps) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive =
             href === "/dashboard"
@@ -67,6 +73,62 @@ export default function Sidebar({ user }: SidebarProps) {
             </Link>
           );
         })}
+
+        {/* My Tasks */}
+        <Link
+          href="/my-tasks"
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+            pathname.startsWith("/my-tasks")
+              ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
+              : "text-slate-400 hover:text-white hover:bg-slate-800"
+          )}
+        >
+          <ClipboardList className="w-4 h-4" />
+          My Tasks
+        </Link>
+
+        {/* Notifications */}
+        <Link
+          href="/notifications"
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+            pathname.startsWith("/notifications")
+              ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
+              : "text-slate-400 hover:text-white hover:bg-slate-800"
+          )}
+        >
+          <div className="relative">
+            <Bell className="w-4 h-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </div>
+          <span>Notifications</span>
+          {unreadCount > 0 && (
+            <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </Link>
+
+        {/* Audit Log — admin only */}
+        {isAdmin && (
+          <Link
+            href="/audit-log"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+              pathname.startsWith("/audit-log")
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
+                : "text-slate-400 hover:text-white hover:bg-slate-800"
+            )}
+          >
+            <ScrollText className="w-4 h-4" />
+            Audit Log
+          </Link>
+        )}
       </nav>
 
       {/* User section */}
@@ -87,6 +149,8 @@ export default function Sidebar({ user }: SidebarProps) {
             </div>
           </div>
         </div>
+
+        <ThemeToggle />
 
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
